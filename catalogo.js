@@ -67,5 +67,14 @@ export const MEMBERS = [
 
 /** ISBN de 13 dígitos válido para la demostración, derivado del índice. */
 export function demoIsbn(index) {
-  return String(9780000000000 + index * 7919)
+  if (!Number.isSafeInteger(index) || index < 0 || index > 999999999) {
+    throw new RangeError('El índice del ISBN debe ser un entero entre 0 y 999999999.')
+  }
+
+  const body = `978${String(index).padStart(9, '0')}`
+  const checksum = [...body].reduce((sum, digit, position) =>
+    sum + Number(digit) * (position % 2 === 0 ? 1 : 3), 0)
+  const checkDigit = (10 - (checksum % 10)) % 10
+
+  return `${body}${checkDigit}`
 }
