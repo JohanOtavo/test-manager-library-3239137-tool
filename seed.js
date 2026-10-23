@@ -227,6 +227,9 @@ async function seedLoans(books, members, state) {
   }
 
   console.log(`Préstamos: ${registered} registrados, ${overdue} con fecha atrasada.`)
+  if (registered !== TOTAL_LOANS) {
+    throw new Error("Seed incomplete: expected " + TOTAL_LOANS + " loans, registered " + registered + ".")
+  }
 }
 
 async function report() {
