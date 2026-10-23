@@ -1,0 +1,10 @@
+{
+    "name": "manager-library-tool",
+    "private": true,
+    "type": "module",
+    "description": "Sembrador de datos de demostracion de Manager Library.",
+    "scripts": {
+        "seed": "node seed.js",
+        "test": "node --test"
+    }
+}
