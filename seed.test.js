@@ -3,6 +3,40 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import { BOOKS, demoIsbn } from './catalogo.js'
+
+test('todos los ISBN del catálogo cumplen el checksum ISBN-13 y son únicos', () => {
+  const isbns = BOOKS.map((_, index) => demoIsbn(index + 1))
+
+  assert.equal(isbns.length, 40)
+  assert.equal(new Set(isbns).size, isbns.length)
+
+  for (const isbn of isbns) {
+    assert.match(isbn, /^\d{13}$/)
+    const checksum = [...isbn.slice(0, 12)].reduce((sum, digit, position) =>
+      sum + Number(digit) * (position % 2 === 0 ? 1 : 3), 0)
+    assert.equal((10 - (checksum % 10)) % 10, Number(isbn[12]), `${isbn} tiene dígito de control inválido`)
+  }
+})
+
+test('demoIsbn rechaza índices fuera del rango admitido', () => {
+  assert.throws(() => demoIsbn(-1), RangeError)
+  assert.throws(() => demoIsbn(1.5), RangeError)
+  assert.throws(() => demoIsbn(Number.MAX_SAFE_INTEGER), RangeError)
+})
+
+test('el sembrador falla antes de contactar la API si falta ADMIN_PASSWORD', async () => {
+  const originalPassword = process.env.ADMIN_PASSWORD
+  delete process.env.ADMIN_PASSWORD
+
+  try {
+    const { main } = await import(`./seed.js?missing-password=${Date.now()}`)
+    await assert.rejects(main(), /Falta ADMIN_PASSWORD/)
+  } finally {
+    if (originalPassword === undefined) delete process.env.ADMIN_PASSWORD
+    else process.env.ADMIN_PASSWORD = originalPassword
+  }
+})
 
 test('repetir la siembra contra la misma API no duplica préstamos', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'manager-library-seed-'))
