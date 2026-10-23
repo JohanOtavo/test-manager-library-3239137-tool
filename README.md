@@ -1,50 +1,71 @@
 # test-manager-library-3239137-tool
 
-> **Prueba técnica · Ficha ADSO 3239137**
-> Horario: **viernes 23 de octubre de 2026, de 7:00 a. m. a 11:00 a. m.** (hora Colombia). Entrega a las **11:00 a. m.**
+Sembrador de datos de demostración de **Manager Library**: deja la base con
+catálogo, socios y préstamos suficientes para una demostración real.
 
-Este repositorio guarda las **utilidades** de *Manager Library*: el sembrador de datos de demostración, que usa la API. **Empieza vacío a propósito**: se construye en el fork de cada aprendiz.
+## Qué siembra
 
-## Instrucciones
-
-Cada aprendiz debe **crear el fork** de los seis repositorios del proyecto y **resolver el proyecto
-con el spec planteado**.
-
-1. Hacer fork, a su cuenta de GitHub, de cada repositorio de la tabla del final.
-2. Leer el spec en [`test-manager-library-3239137-docs`](https://github.com/code-sena/test-manager-library-3239137-docs).
-   Se entrega en dos versiones: `spec-python/` y `spec-.net/`.
-3. Desarrollar en los forks.
-
-## El reto se desarrolla con React y PHP (Laravel)
-
-El spec está escrito para Python y para .NET, pero el reto **no** se hace en esos lenguajes:
-
-| Capa | Tecnología del reto |
+| Qué | Cuánto |
 |---|---|
-| Frontend | React |
-| Backend | PHP con Laravel |
+| Libros | 40, repartidos entre las cinco categorías, con 1 a 4 ejemplares |
+| Socios | 10 |
+| Préstamos | 15, de los cuales **3 nacen vencidos** |
 
-Lo que el spec define sobre el negocio —historias, criterios de aceptación, reglas, contrato de la
-API, modelo de datos— se respeta. Lo que define sobre la tecnología se traduce a React y Laravel.
+## Cómo se corre
 
-## La prueba no consiste en escribir el código
+Con `infra` levantado y la API respondiendo:
 
-El propósito principal es ver la **capacidad de desempeño con SDD** (*Spec-Driven Development*,
-desarrollo guiado por especificación): cómo se lee, se interpreta y se aplica una especificación
-para llevarla a un stack distinto. El código es el medio, no el fin.
+```bash
+API_URL=http://localhost:8000/api/v1 \
+ADMIN_USERNAME=admin \
+ADMIN_PASSWORD=la-clave-del-env \
+npm run seed
+```
 
-## Entrega
+No tiene dependencias: usa el `fetch` de Node 18 o superior.
 
-Cuenta lo que quede **subido a los forks antes de las 11:00 a. m.** Lo que llegue después no se revisa.
-No hay prórroga: suban avances parciales con commits pequeños durante la prueba.
+La prueba local del sembrador se ejecuta con `npm test`. Usa una API simulada y
+comprueba que dos ejecuciones no dupliquen los 15 préstamos; no escribe en la
+API ni en la base de datos reales.
 
-## Los seis repositorios
+## Habla por la API, nunca por SQL
 
-| Repositorio | Qué va ahí |
-|---|---|
-| [`test-manager-library-3239137-docs`](https://github.com/code-sena/test-manager-library-3239137-docs) | El spec: `spec-python/` y `spec-.net/` |
-| [`test-manager-library-3239137-api`](https://github.com/code-sena/test-manager-library-3239137-api) | Backend en PHP (Laravel) |
-| [`test-manager-library-3239137-app`](https://github.com/code-sena/test-manager-library-3239137-app) | Frontend en React |
-| [`test-manager-library-3239137-page`](https://github.com/code-sena/test-manager-library-3239137-page) | Sitio público estático de presentación |
-| [`test-manager-library-3239137-infra`](https://github.com/code-sena/test-manager-library-3239137-infra) | Contenedores, red, volúmenes y motor de base de datos vacío |
-| [`test-manager-library-3239137-tool`](https://github.com/code-sena/test-manager-library-3239137-tool) | Utilidades: sembrador de datos de demostración |
+Lo exige el spec (data-model §9) y tiene sentido: así los datos de demostración
+pasan por las mismas reglas que los de verdad. Si el sembrador tuviera que
+escribir SQL para que algo encajara, lo que estaría mal es la API.
+
+Los conflictos 409 de libro o socio repetido se ignoran. El sembrador guarda en
+`.seed-state.json` los identificadores de los préstamos creados para no volver a
+registrarlos al ejecutarlo otra vez contra la misma API. Ese archivo es local,
+está excluido de Git y se puede borrar si se quiere empezar una demostración
+nueva; en ese caso conviene usar una base recién creada para evitar duplicar
+préstamos.
+
+## Los 3 vencidos y el desvío de reloj
+
+Para que una línea esté vencida, su `due_at` tiene que estar en el pasado, y el
+dominio lo calcula como `loaned_at + 14 días`. Por la API no hay forma de pedir
+un préstamo con fecha vieja, y escribir SQL está prohibido.
+
+La salida es la que el propio spec ya propone: **el reloj es un puerto** (D-05),
+así que se cambia el reloj. El sembrador manda la cabecera
+`X-Library-Clock-Offset-Days: -20` en esos tres préstamos, y la API solo la
+atiende si corre con `DEMO_CLOCK=true` y `APP_ENV=local`.
+
+Sin esas dos variables la cabecera se ignora sin más: los préstamos se registran
+con la fecha de hoy y el script avisa de que salieron menos vencidos de los
+esperados. Es un asiento para la demostración, acotado a propósito, y no existe
+fuera de local.
+
+## Evidencia (T-21)
+
+Después de correrlo:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/v1/loans/overdue
+# items: 3 líneas
+
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8000/api/v1/reports/most-borrowed?from=2026-10-01&to=2026-10-31"
+# rows: con filas
+```
